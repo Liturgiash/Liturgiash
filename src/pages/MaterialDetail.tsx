@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Edit, Loader2, Package, Plus, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowLeft, Edit, Loader2, Package, Plus, TrendingDown, TrendingUp, Trash2, AlertTriangle } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -15,6 +15,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { fmtDateTime } from "@/lib/format";
 import { toast } from "sonner";
 
@@ -99,6 +104,27 @@ export default function MaterialDetail() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("delete_material_safe" as any, {
+        p_material_id: material!.id,
+        p_user_id: user?.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["materials"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success("Material excluído");
+      navigate("/materials");
+    },
+    onError: (e: any) => {
+      const msg = e.message ?? "";
+      const match = msg.match(/ERROR:\s*(.*)/);
+      toast.error(match ? match[1] : msg);
+    },
+  });
+
   const loading = loadingMat || loadingMov;
 
   if (loading) return <div className="space-y-4"><Skeleton className="h-64 w-full" /><Skeleton className="h-40 w-full" /></div>;
@@ -137,6 +163,7 @@ export default function MaterialDetail() {
                 {material.responsible && <Badge variant="outline">Resp: {material.responsible}</Badge>}
               </div>
             </div>
+            <div className="flex items-center gap-2">
             <Dialog open={editOpen} onOpenChange={setEditOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" onClick={() => setEditForm({
@@ -170,6 +197,37 @@ export default function MaterialDetail() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            {/* Botão excluir material */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10">
+                  <Trash2 className="h-4 w-4 mr-1" />Excluir
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                    Excluir material?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    O material <strong>"{material.name}"</strong> será excluído permanentemente,
+                    incluindo seu histórico de movimentações. Se estiver alocado em eventos ativos,
+                    a exclusão será bloqueada.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deleteMutation.mutate()}
+                    className="bg-destructive hover:bg-destructive/90">
+                    {deleteMutation.isPending ? "Excluindo..." : "Sim, excluir"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            </div>
           </div>
 
           {material.description && <p className="text-sm text-muted-foreground mb-6">{material.description}</p>}

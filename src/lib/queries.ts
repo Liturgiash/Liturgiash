@@ -63,13 +63,13 @@ export const fetchEvent = async (id: string) => {
 export const fetchEventItems = async (eventId: string) => {
   const { data, error } = await supabase
     .from("event_materials")
-    .select("id, quantity, material:materials(id, name, category, responsible)")
+    .select("id, quantity, material:materials(id, name, category, responsible, image_url)")
     .eq("event_id", eventId);
   if (error) throw error;
   return (data ?? []) as {
     id: string;
     quantity: number;
-    material: { id: string; name: string; category: string | null; responsible: string | null } | null;
+    material: { id: string; name: string; category: string | null; responsible: string | null; image_url: string | null } | null;
   }[];
 };
 
